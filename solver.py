@@ -52,16 +52,16 @@ def solve(lock: Lock):
     target_moves = np.linalg.inv(lock.binds.T) @ (lock.finishing_state - lock.positions)
 
     if not np.abs(target_moves.astype(int) - target_moves).max() < 0.000001:
-        print('IMPOSSIBLE LOCK - FRACTIONS')
+        raise ValueError('IMPOSSIBLE LOCK - FRACTIONS')
         return []
     explored = {}
     stack = {lock: ([], np.abs(target_moves).sum(), np.zeros(lock.positions.shape[0]))} # {lock: (current moves, remaining_estimate, total_inputs)}
     i = 0
     while True:
         if not stack:
-            print('IMPOSSIBLE LOCK - BINDS')
+            raise ValueError('IMPOSSIBLE LOCK - BINDS')
             return []
-        lock = min(stack.keys(), key=lambda key: len(stack[key][0]) + stack[key][1])
+        lock = min(stack.keys(), key=lambda key: len(stack[key][0]) + stack[key][1] * 1.01)
         performed_moves, current_estimate, total_inputs = stack[lock]
         if lock.is_solved():
             print(i)
@@ -98,8 +98,9 @@ def solve_lock(positions: list[int], binds: list[list[int]]):
     #       binds = [[2, -3], [-1], [6], [], [-2], [3]]
     b = parse_binds(binds, len(positions))
     lock = Lock(np.array(positions), b)
-    res = solve(lock)
-    if res:
-        moves, explored, stack = res
+    try:
+        moves, explored, stack = solve(lock)
         return '\n'.join([f'Component {idx+1} {"LEFT" if direction < 0 else "RIGHT"}' for idx, direction in moves])
+    except Exception as e:
+        return e
     return None
