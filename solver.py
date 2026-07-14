@@ -55,7 +55,8 @@ def solve(lock: Lock):
         print(e)
         print('Attempting backup solver')
         return solve_backup(lock)
-    if not np.abs(np.round(target_moves) - target_moves).max() < 0.000001:
+    if np.abs(np.round(target_moves) - target_moves).max() > 0.01:
+        # return solve_backup(lock)
         raise ValueError('IMPOSSIBLE LOCK - FRACTIONS')
         return []
     explored = {}
