@@ -50,12 +50,14 @@ def get_random_lock(n=6, difficulty=0.5):
 
 def solve(lock: Lock):
     try:
+        if np.linalg.det(lock.binds.T) < 0.001:
+            raise ValueError('Fucked matrix')
         target_moves = np.linalg.inv(lock.binds.T) @ (lock.finishing_state - lock.positions)
     except Exception as e:
         print(e)
         print('Attempting backup solver')
         return solve_backup(lock)
-    if np.abs(np.round(target_moves) - target_moves).max() > 0.0001:
+    if np.abs(np.round(target_moves) - target_moves).max() > 0.01:
         # return solve_backup(lock)
         raise ValueError('IMPOSSIBLE LOCK - FRACTIONS')
         return []
@@ -64,13 +66,13 @@ def solve(lock: Lock):
     i = 0
     while True:
         if not stack:
-            raise ValueError('IMPOSSIBLE LOCK - NO MORE MOVES')
+            raise ValueError('IMPOSSIBLE LOCK - CHECKED ALL POSSIBLE MOVES')
             return []
         lock = min(stack.keys(), key=lambda key: len(stack[key][0]) + stack[key][1] * 1.01)
         performed_moves, current_estimate, total_inputs = stack[lock]
         if lock.is_solved():
             print(i)
-            return performed_moves, explored, stack
+            return performed_moves, explored, stack, i, 'linalg solver'
 
         del stack[lock]
         explored[lock] = (performed_moves, current_estimate, total_inputs)
@@ -98,13 +100,13 @@ def solve_backup(lock: Lock):
     i = 0
     while True:
         if not stack:
-            raise ValueError('IMPOSSIBLE LOCK - NO MORE MOVES')
+            raise ValueError('IMPOSSIBLE LOCK - CHECKED ALL POSSIBLE MOVES')
             return []
-        lock = min(stack.keys(), key=lambda key: len(stack[key][0]) + stack[key][1] * 1.01)
+        lock = min(stack.keys(), key=lambda key: float(len(stack[key][0])) + float(stack[key][1]) * 1.01)
         performed_moves, current_estimate = stack[lock]
         if lock.is_solved():
             print(i)
-            return performed_moves, explored, stack
+            return performed_moves, explored, stack, i, 'backup solver'
 
         del stack[lock]
         explored[lock] = (performed_moves, current_estimate)
@@ -124,7 +126,7 @@ def solve_backup(lock: Lock):
             stack[new_lock] = (new_performed_moves, remaining_estimate)
 
 def parse_binds(binds: list[list[int]], n: int):
-    b = np.eye(n, dtype=int)
+    b = np.eye(n, dtype=float)
     for y, bind in enumerate(binds):
         for bind_idx in bind:
             b[y, abs(bind_idx) - 1] = 1 if bind_idx > 0 else -1
@@ -134,10 +136,11 @@ def solve_lock(positions: list[int], binds: list[list[int]]):
     # E.G.  positions = [0,3,5,6,1,2]
     #       binds = [[2, -3], [-1], [6], [], [-2], [3]]
     b = parse_binds(binds, len(positions))
-    lock = Lock(np.array(positions, dtype=int), b)
+    lock = Lock(np.array(positions, dtype=float), b)
     try:
-        moves, explored, stack = solve(lock)
-        return '\n'.join([f'Component {idx+1} {"LEFT" if direction < 0 else "RIGHT"}' for idx, direction in moves])
+        moves, explored, stack, i, solver = solve(lock)
+        # moves, explored, stack, i = solve_backup(lock)
+        return f'Solved after considering {i} moves using {solver}\n' + '\n'.join([f'Component {idx+1} {"LEFT" if direction < 0 else "RIGHT"}' for idx, direction in moves])
     except Exception as e:
         return e
     return None
