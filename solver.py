@@ -49,9 +49,13 @@ def get_random_lock(n=6, difficulty=0.5):
     return Lock(positions, binds)
 
 def solve(lock: Lock):
-    target_moves = np.linalg.inv(lock.binds.T) @ (lock.finishing_state - lock.positions)
-
-    if not np.abs(target_moves.astype(int) - target_moves).max() < 0.000001:
+    try:
+        target_moves = np.linalg.inv(lock.binds.T) @ (lock.finishing_state - lock.positions)
+    except Exception as e:
+        print(e)
+        print('Attempting backup solver')
+        return solve_backup(lock)
+    if not np.abs(np.round(target_moves) - target_moves).max() < 0.000001:
         raise ValueError('IMPOSSIBLE LOCK - FRACTIONS')
         return []
     explored = {}
@@ -59,7 +63,7 @@ def solve(lock: Lock):
     i = 0
     while True:
         if not stack:
-            raise ValueError('IMPOSSIBLE LOCK - BINDS')
+            raise ValueError('IMPOSSIBLE LOCK - NO MORE MOVES')
             return []
         lock = min(stack.keys(), key=lambda key: len(stack[key][0]) + stack[key][1] * 1.01)
         performed_moves, current_estimate, total_inputs = stack[lock]
@@ -85,6 +89,38 @@ def solve(lock: Lock):
                 if len(new_performed_moves) >= len(stack[new_lock][0]):
                     continue
             stack[new_lock] = (new_performed_moves, remaining_estimate, new_total_inputs)
+
+
+def solve_backup(lock: Lock):
+    explored = {}
+    stack = {lock: ([], np.abs(lock.positions-lock.finishing_state).sum())}  # {lock: (current moves, remaining_estimate)}
+    i = 0
+    while True:
+        if not stack:
+            raise ValueError('IMPOSSIBLE LOCK - NO MORE MOVES')
+            return []
+        lock = min(stack.keys(), key=lambda key: len(stack[key][0]) + stack[key][1] * 1.01)
+        performed_moves, current_estimate = stack[lock]
+        if lock.is_solved():
+            print(i)
+            return performed_moves, explored, stack
+
+        del stack[lock]
+        explored[lock] = (performed_moves, current_estimate)
+        for possible_move in get_possible_moves(lock):
+            i += 1
+            new_lock = lock.copy()
+            new_lock.move(*possible_move)
+            if new_lock in explored:
+                continue
+            new_performed_moves = performed_moves + [possible_move]
+            remaining_estimate = np.abs(new_lock.positions-lock.finishing_state).sum()
+            if new_lock in stack:
+                if remaining_estimate != stack[new_lock][1]:
+                    print('THIS SHOULD BE THE SAME')
+                if len(new_performed_moves) >= len(stack[new_lock][0]):
+                    continue
+            stack[new_lock] = (new_performed_moves, remaining_estimate)
 
 def parse_binds(binds: list[list[int]], n: int):
     b = np.eye(n)
