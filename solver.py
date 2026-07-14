@@ -55,7 +55,7 @@ def solve(lock: Lock):
         print(e)
         print('Attempting backup solver')
         return solve_backup(lock)
-    if np.abs(np.round(target_moves) - target_moves).max() > 0.01:
+    if np.abs(np.round(target_moves) - target_moves).max() > 0.0001:
         # return solve_backup(lock)
         raise ValueError('IMPOSSIBLE LOCK - FRACTIONS')
         return []
@@ -124,7 +124,7 @@ def solve_backup(lock: Lock):
             stack[new_lock] = (new_performed_moves, remaining_estimate)
 
 def parse_binds(binds: list[list[int]], n: int):
-    b = np.eye(n)
+    b = np.eye(n, dtype=int)
     for y, bind in enumerate(binds):
         for bind_idx in bind:
             b[y, abs(bind_idx) - 1] = 1 if bind_idx > 0 else -1
@@ -134,7 +134,7 @@ def solve_lock(positions: list[int], binds: list[list[int]]):
     # E.G.  positions = [0,3,5,6,1,2]
     #       binds = [[2, -3], [-1], [6], [], [-2], [3]]
     b = parse_binds(binds, len(positions))
-    lock = Lock(np.array(positions), b)
+    lock = Lock(np.array(positions, dtype=int), b)
     try:
         moves, explored, stack = solve(lock)
         return '\n'.join([f'Component {idx+1} {"LEFT" if direction < 0 else "RIGHT"}' for idx, direction in moves])
