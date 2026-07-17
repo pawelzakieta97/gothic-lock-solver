@@ -50,7 +50,7 @@ def get_random_lock(n=6, difficulty=0.5):
 
 def solve(lock: Lock):
     try:
-        if np.linalg.det(lock.binds.T) < 0.001:
+        if abs(np.linalg.det(lock.binds.T)) < 0.001:
             raise ValueError('Fucked matrix')
         target_moves = np.linalg.inv(lock.binds.T) @ (lock.finishing_state - lock.positions)
     except Exception as e:
@@ -78,6 +78,8 @@ def solve(lock: Lock):
         explored[lock] = (performed_moves, current_estimate, total_inputs)
         for possible_move in get_possible_moves(lock):
             i += 1
+            if not i % 1000:
+                print(i, f'estimated remaining moves: {current_estimate}')
             new_lock = lock.copy()
             new_lock.move(*possible_move)
             if new_lock in explored:
@@ -102,7 +104,7 @@ def solve_backup(lock: Lock):
         if not stack:
             raise ValueError('IMPOSSIBLE LOCK - CHECKED ALL POSSIBLE MOVES')
             return []
-        lock = min(stack.keys(), key=lambda key: float(len(stack[key][0])) + float(stack[key][1]) * 1.01)
+        lock = min(stack.keys(), key=lambda key: float(len(stack[key][0])) + float(stack[key][1]) * 2)
         performed_moves, current_estimate = stack[lock]
         if lock.is_solved():
             print(i)
