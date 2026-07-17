@@ -127,6 +127,35 @@ def solve_backup(lock: Lock):
                     continue
             stack[new_lock] = (new_performed_moves, remaining_estimate)
 
+def simplify_moves(lock, moves):
+    max_passes = 100
+
+    def eval_moves(_moves):
+        return sum([_moves[i] != _moves[i+1] for i in range(len(_moves)-1)])
+    init_score = eval_moves(moves)
+    best_score = init_score
+    best_moves = moves
+    for p in range(max_passes):
+        for d in range(1, 5):
+            for i in range(len(moves)-d):
+                swapped = moves[:i] + [moves[i+d]] + moves[i+1:i+d] + [moves[i]]  + moves[i+d+1:]
+                score = eval_moves(swapped)
+                if score < best_score:
+                    l = lock.copy()
+                    try:
+                        for move in swapped:
+                            l.move(*move)
+                        assert l.is_solved()
+                    except ValueError:
+                        continue
+                    best_score = score
+                    best_moves = swapped
+    if best_score < init_score:
+        print(f'Decreased number of gate switches from {init_score} to {best_score}')
+    return best_moves
+
+
+
 def parse_binds(binds: list[list[int]], n: int):
     b = np.eye(n, dtype=float)
     for y, bind in enumerate(binds):
@@ -141,6 +170,7 @@ def solve_lock(positions: list[int], binds: list[list[int]]):
     lock = Lock(np.array(positions, dtype=float), b)
     try:
         moves, explored, stack, i, solver = solve(lock)
+        better_moves = simplify_moves(lock, moves)
         # moves, explored, stack, i = solve_backup(lock)
         return f'Solved after considering {i} moves using {solver}\n' + '\n'.join([f'Component {idx+1} {"RIGHT" if direction < 0 else "LEFT"}' for idx, direction in moves])
     except Exception as e:
