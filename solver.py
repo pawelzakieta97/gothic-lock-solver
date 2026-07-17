@@ -172,7 +172,7 @@ def solve_lock(positions: list[int], binds: list[list[int]]):
         moves, explored, stack, i, solver = solve(lock)
         better_moves = simplify_moves(lock, moves)
         # moves, explored, stack, i = solve_backup(lock)
-        return f'Solved after considering {i} moves using {solver}\n' + '\n'.join([f'Component {idx+1} {"RIGHT" if direction < 0 else "LEFT"}' for idx, direction in moves])
+        return f'Solved after considering {i} moves using {solver}\n' + '\n'.join([f'Component {idx+1} {"RIGHT" if direction < 0 else "LEFT"}' for idx, direction in better_moves])
     except Exception as e:
         return e
     return None
