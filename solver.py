@@ -104,7 +104,7 @@ def solve_backup(lock: Lock):
         if not stack:
             raise ValueError('IMPOSSIBLE LOCK - CHECKED ALL POSSIBLE MOVES')
             return []
-        lock = min(stack.keys(), key=lambda key: float(len(stack[key][0])) + float(stack[key][1]) * 2)
+        lock = min(stack.keys(), key=lambda key: float(len(stack[key][0])) + float(stack[key][1]) * 1.01)
         performed_moves, current_estimate = stack[lock]
         if lock.is_solved():
             print(i)
