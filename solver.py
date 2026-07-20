@@ -49,6 +49,13 @@ def get_random_lock(n=6, difficulty=0.5):
     return Lock(positions, binds)
 
 def solve(lock: Lock):
+    solution = _solve(lock, complexity_penalty=0.01, max_iters=50_000)
+    if solution is None:
+        # In case introduction of complexity penalty prevents finding a solution
+        solution = _solve(lock, complexity_penalty=0)
+    return solution
+
+def _solve(lock: Lock, complexity_penalty = 0.01, max_iters=50_000):
     try:
         if abs(np.linalg.det(lock.binds.T)) < 0.001:
             raise ValueError('Fucked matrix')
@@ -64,22 +71,31 @@ def solve(lock: Lock):
     explored = {}
     stack = {lock: ([], np.abs(target_moves).sum(), np.zeros(lock.positions.shape[0]))} # {lock: (current moves, remaining_estimate, total_inputs)}
     i = 0
+
     while True:
         if not stack:
             raise ValueError('IMPOSSIBLE LOCK - CHECKED ALL POSSIBLE MOVES')
             return []
-        lock = min(stack.keys(), key=lambda key: len(stack[key][0]) + stack[key][1] * 1.01)
+
+        def complexity(_moves):
+            return sum([_moves[i] != _moves[i + 1] for i in range(len(_moves) - 1)])
+
+        lock = min(stack.keys(), key=lambda key: len(stack[key][0]) +
+                                                 stack[key][1] * 1.01 + # slight depth first prioritization
+                                                 complexity(stack[key][0]) * complexity_penalty) # penalize gate switches
         performed_moves, current_estimate, total_inputs = stack[lock]
         if lock.is_solved():
-            print(i)
+            print(i, complexity(performed_moves))
             return performed_moves, explored, stack, i, 'linalg solver'
 
         del stack[lock]
         explored[lock] = (performed_moves, current_estimate, total_inputs)
         for possible_move in get_possible_moves(lock):
             i += 1
-            if not i % 1000:
+            if not i % 10_00:
                 print(i, f'estimated remaining moves: {current_estimate}')
+            if i > max_iters:
+                return None
             new_lock = lock.copy()
             new_lock.move(*possible_move)
             if new_lock in explored:
@@ -91,7 +107,7 @@ def solve(lock: Lock):
             if new_lock in stack:
                 if remaining_estimate != stack[new_lock][1]:
                     print('THIS SHOULD BE THE SAME')
-                if len(new_performed_moves) >= len(stack[new_lock][0]):
+                if len(new_performed_moves) + complexity(new_performed_moves) * complexity_penalty >= len(stack[new_lock][0]) + complexity(stack[new_lock][0]) * complexity_penalty:
                     continue
             stack[new_lock] = (new_performed_moves, remaining_estimate, new_total_inputs)
 
@@ -127,34 +143,6 @@ def solve_backup(lock: Lock):
                     continue
             stack[new_lock] = (new_performed_moves, remaining_estimate)
 
-def simplify_moves(lock, moves):
-    max_passes = 100
-
-    def eval_moves(_moves):
-        return sum([_moves[i] != _moves[i+1] for i in range(len(_moves)-1)])
-    init_score = eval_moves(moves)
-    best_score = init_score
-    best_moves = moves
-    for p in range(max_passes):
-        for d in range(1, 5):
-            for i in range(len(moves)-d):
-                swapped = moves[:i] + [moves[i+d]] + moves[i+1:i+d] + [moves[i]]  + moves[i+d+1:]
-                score = eval_moves(swapped)
-                if score < best_score:
-                    l = lock.copy()
-                    try:
-                        for move in swapped:
-                            l.move(*move)
-                        assert l.is_solved()
-                    except ValueError:
-                        continue
-                    best_score = score
-                    best_moves = swapped
-    if best_score < init_score:
-        print(f'Decreased number of gate switches from {init_score} to {best_score}')
-    return best_moves
-
-
 
 def parse_binds(binds: list[list[int]], n: int):
     b = np.eye(n, dtype=float)
@@ -170,9 +158,8 @@ def solve_lock(positions: list[int], binds: list[list[int]]):
     lock = Lock(np.array(positions, dtype=float), b)
     try:
         moves, explored, stack, i, solver = solve(lock)
-        better_moves = simplify_moves(lock, moves)
         # moves, explored, stack, i = solve_backup(lock)
-        return f'Solved after considering {i} moves using {solver}\n' + '\n'.join([f'Component {idx+1} {"RIGHT" if direction < 0 else "LEFT"}' for idx, direction in better_moves])
+        return f'Solved after considering {i} moves using {solver}\n' + '\n'.join([f'Component {idx+1} {"RIGHT" if direction < 0 else "LEFT"}' for idx, direction in moves])
     except Exception as e:
         return e
     return None
